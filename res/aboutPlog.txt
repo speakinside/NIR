@@ -1,0 +1,8 @@
+<div>
+<h>Plog - portable, simple and extensible C++ logging library</h>
+<p>
+Pretty powerful logging library in about 1000 lines of code.
+
+Plog is licensed under the <a href="http://mozilla.org/MPL/2.0/">MPL version 2.0</a>. You can freely use it in your commercial or opensource software.
+</p>
+</div>

@@ -1,0 +1,12 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>res/connect.png</file>
+        <file>res/dark.png</file>
+        <file>res/ref.png</file>
+        <file>res/spectra.png</file>
+        <file>res/connect2.png</file>
+    </qresource>
+    <qresource prefix="/text">
+        <file>res/aboutPlog.txt</file>
+    </qresource>
+</RCC>
