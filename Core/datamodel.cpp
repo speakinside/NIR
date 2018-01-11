@@ -6,6 +6,23 @@
 #include <QChart>
 #include <cmath>
 
+Sample::~Sample()
+{
+    LOG_WARNING << QString("Entry: %0 deleted").arg(name).toStdString();
+    if (absorbance != nullptr)
+    {
+        if (absorbance->chart() != nullptr)
+            absorbance->chart()->removeSeries(absorbance);
+        delete absorbance;
+    }
+    if (intensity != nullptr)
+    {
+        if (intensity->chart() != nullptr)
+            intensity->chart()->removeSeries(intensity);
+        delete intensity;
+    }
+}
+
 DataModel::DataModel(DeviceInterface *device, QObject *parent) : QAbstractTableModel(parent), device(device)
 {
     //qsrand(QTime(0,0,0).secsTo(QTime::currentTime()));
@@ -14,7 +31,7 @@ DataModel::DataModel(DeviceInterface *device, QObject *parent) : QAbstractTableM
 int DataModel::rowCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
-    return data_table.size();
+    return dataTable.size();
 }
 
 int DataModel::columnCount(const QModelIndex &parent) const
@@ -49,8 +66,14 @@ QVariant DataModel::headerData(int section, Qt::Orientation orientation, int rol
         if (orientation == Qt::Vertical)
         {
             auto pix = QPixmap(50, 50);
-            pix.fill(std::get<4>(data_table.at(section))->color());
+            pix.fill(dataTable.at(section)->intensity->color());
             return pix;
+        }
+        return QVariant();
+    case Qt::UserRole: // return the Color of the entry using
+        if (orientation == Qt::Vertical)
+        {
+            return dataTable.at(section)->intensity->color();
         }
         return QVariant();
     default:
@@ -66,18 +89,18 @@ QVariant DataModel::data(const QModelIndex &index, int role) const
         switch (index.column())
         {
         case 0:
-            return std::get<0>(data_table.at(index.row()));
+            return dataTable.at(index.row())->name;
         case 1:
-            return QString::number(std::get<1>(data_table.at(index.row())));
+            return QString::number(dataTable.at(index.row())->index);
         case 2:
-            return std::get<2>(data_table.at(index.row())).toString();
+            return dataTable.at(index.row())->dateTime.toString();
         case 3:
         {
-            auto &v = std::get<3>(data_table.at(index.row()));
-            return tr("%1-%2").arg(v->front().x()).arg(v->back().x());
+            auto v = dataTable.at(index.row())->intensity->pointsVector();
+            return tr("%1-%2").arg(v.front().x()).arg(v.back().x());
         }
         case 4:
-            if (std::get<4>(data_table.at(index.row()))->isVisible())
+            if (dataTable.at(index.row())->intensity->isVisible())
                 return tr("Show");
             else
                 return tr("Hide");
@@ -88,18 +111,11 @@ QVariant DataModel::data(const QModelIndex &index, int role) const
         switch (index.column())
         {
         case 0:
-            return std::get<0>(data_table.at(index.row()));
+            return dataTable.at(index.row())->name;
         case 1:
-            return QString::number(std::get<1>(data_table.at(index.row())));
+            return dataTable.at(index.row())->index;
         default:
             return QVariant();
-        }
-    case Qt::StatusTipRole:
-        switch (index.column())
-        {
-        //TO DO: Every colunms status tips
-        default:
-            return tr("Status tips");
         }
     case Qt::TextAlignmentRole:
         return Qt::AlignCenter;
@@ -112,9 +128,9 @@ bool DataModel::setHeaderData(int section, Qt::Orientation orientation, const QV
 {
     if (orientation == Qt::Vertical && role == Qt::DecorationRole)
     {
-        std::get<4>(data_table.at(section))->setColor(value.value<QColor>());
+        dataTable.at(section)->intensity->setColor(value.value<QColor>());
         if (section > 1)
-            std::get<5>(data_table.at(section))->setColor(value.value<QColor>());
+            dataTable.at(section)->absorbance->setColor(value.value<QColor>());
         emit headerDataChanged(Qt::Vertical, section, section);
         return true;
     }
@@ -125,7 +141,7 @@ bool DataModel::setData(const QModelIndex &index, const QVariant &value, int rol
 {
     if (role == Qt::EditRole && index.column() == 0)
     {
-        auto &name = std::get<0>(data_table[index.row()]);
+        auto &name = dataTable[index.row()]->name;
         auto new_name = value.toString();
         if (new_name.isEmpty())
             return false;
@@ -138,15 +154,15 @@ bool DataModel::setData(const QModelIndex &index, const QVariant &value, int rol
     {
         if (value.toString() == "Hide")
         {
-            std::get<4>(data_table[index.row()])->setVisible(false);
+            dataTable.at(index.row())->intensity->setVisible(false);
             if (index.row() > 1)
-                std::get<5>(data_table[index.row()])->setVisible(false);
+                dataTable.at(index.row())->absorbance->setVisible(false);
         }
         else
         {
-            std::get<4>(data_table[index.row()])->setVisible(true);
+            dataTable.at(index.row())->intensity->setVisible(true);
             if (index.row() > 1)
-                std::get<5>(data_table[index.row()])->setVisible(true);
+                dataTable.at(index.row())->absorbance->setVisible(true);
         }
         emit dataChanged(index, index, QVector<int>({Qt::DisplayRole}));
     }
@@ -175,12 +191,9 @@ bool DataModel::removeRows(int row, int count, const QModelIndex &parent)
     beginRemoveRows(parent, row, row + count - 1);
     while (count--)
     {
-        std::get<4>(data_table[row])->chart()->removeSeries(std::get<4>(data_table[row]));
-        std::get<5>(data_table[row])->chart()->removeSeries(std::get<5>(data_table[row]));
-        delete std::get<3>(data_table[row]); // delete spectrum intensity data
-        delete std::get<4>(data_table[row]); // delete Intensity series
-        delete std::get<5>(data_table[row]); // delete Absorbance series
-        data_table.removeAt(row);
+        // struct Sample self-manage the deletion of series
+        delete dataTable[row];
+        dataTable.removeAt(row);
     }
     endRemoveRows();
     return true;
@@ -188,27 +201,29 @@ bool DataModel::removeRows(int row, int count, const QModelIndex &parent)
 
 QList<QPointF> *DataModel::intToAbs(const QList<QPointF> *intSpectra)
 {
+    // This function is mainly used in the creation of absorbance series.
+    // As calling the series.pointsVector() is much more effecient than series.points()
+    // So this function is rarely used outside the fuction of DataMode::getSpectrum
+    // Because QList<QPoints> mainly used in that function.
+    LOG_DEBUG << "Calculate the absorbance.";
     auto list = new QList<QPointF>();
-    auto dark = std::get<3>(data_table[0]);
-    auto ref = std::get<3>(data_table[1]);
+    auto dark = dataTable[0]->intensity->pointsVector();
+    auto ref = dataTable[1]->intensity->pointsVector();
     for (int c = 0; c < intSpectra->size(); c++)
         list->append(QPointF(intSpectra->at(c).x(),
-                             std::log10((ref->at(c).y() - dark->at(c).y()) / (intSpectra->at(c).y() - dark->at(c).y()))));
+                             std::log10((ref.at(c).y() - dark.at(c).y()) / (intSpectra->at(c).y() - dark.at(c).y()))));
     return list;
 }
 
 void DataModel::changeVisible(const QModelIndex &index)
 {
-    if (std::get<4>(data_table.at(index.row()))->isVisible())
+    LOG_INFO << QString("The visibility of serie at row %0 changed").arg(index.row());
+    if (dataTable[index.row()]->intensity->isVisible())
         setData(index, "Hide", Qt::DisplayRole);
     else
         setData(index, "Show", Qt::DisplayRole);
 }
 
-void DataModel::save()
-{
-
-}
 
 QXYSeries *DataModel::dataToLine(QList<QPointF> *spectrum, QString chart, QAbstractSeries::SeriesType type)
 {
@@ -235,78 +250,81 @@ QXYSeries *DataModel::dataToLine(QList<QPointF> *spectrum, QString chart, QAbstr
 
 void DataModel::getSpectrum(QString name, int index, QAbstractSeries::SeriesType type)
 {
-    if(!device->isConnected())
+    if (!device->isConnected())
     {
         emit noConnection();
         return;
     }
-    if (data_table.size() < 2)
+    if (dataTable.size() < 2)
     {
         emit noRefAndDark();
         return;
     }
     auto spectrum = new QList<QPointF>;
     device->getSpectrum(spectrum);
-    data_table.append(std::make_tuple(name, index, QDateTime::currentDateTime(), spectrum, dataToLine(spectrum, "intensity", type), dataToLine(intToAbs(spectrum), "absorbance", type)));
-    std::get<5>(data_table.last())->setColor(std::get<4>(data_table.last())->color()); //synchronize the color
+    LOG_DEBUG << "Begin new data entry creation and insertion";
+    dataTable << new Sample{name, index, QDateTime::currentDateTime(), dataToLine(spectrum), dataToLine(intToAbs(spectrum), "absorbance")};
+    dataTable.last()->absorbance->setColor(dataTable.last()->intensity->color()); //synchronize the color
     insertRow(rowCount() - 1);
 }
 
 void DataModel::getRef(int index, QAbstractSeries::SeriesType type)
 {
-    if(!device->isConnected())
+    if (!device->isConnected())
     {
         emit noConnection();
         return;
     }
-    if (data_table.empty())
+    if (dataTable.empty())
     {
         emit noRefAndDark();
         return;
     }
     auto spectrum = new QList<QPointF>;
     device->getRef(spectrum);
-    if (data_table.size() < 2)
+    if (dataTable.size() < 2)
     {
-        data_table.append(std::make_tuple(tr("Ref"), index, QDateTime::currentDateTime(), spectrum, dataToLine(spectrum, "intensity", type), nullptr));
+        dataTable.append(new Sample{"Ref", index, QDateTime::currentDateTime(), dataToLine(spectrum, "intensity", type), nullptr});
         insertRow(rowCount() - 1);
     }
     else
     {
-        auto &old_ref = data_table[1];
-        delete std::get<3>(old_ref);
-        auto chart = std::get<4>(old_ref)->chart();
-        if (chart != nullptr)
-            chart->removeSeries(std::get<4>(old_ref));
-        delete std::get<4>(old_ref);
-        data_table[1] = std::make_tuple(tr("Ref"), index, QDateTime::currentDateTime(), spectrum, dataToLine(spectrum, "intensity", type), nullptr);
+        LOG_WARNING << "Old reference is going to be replaced.";
+        delete dataTable[1];
+        dataTable[1] = new Sample{"Ref", index, QDateTime::currentDateTime(), dataToLine(spectrum, "intensity", type), nullptr};
         emit dataChanged(createIndex(1, 0), createIndex(1, columnCount() - 1), QVector<int>({Qt::DisplayRole}));
     }
 }
 
 void DataModel::getDark(int index, QAbstractSeries::SeriesType type)
 {
-    if(!device->isConnected())
+    if (!device->isConnected())
     {
         emit noConnection();
         return;
     }
     auto spectrum = new QList<QPointF>;
     device->getDark(spectrum);
-    if (data_table.empty())
+    if (dataTable.empty())
     {
-        data_table.append(std::make_tuple(tr("Dark"), index, QDateTime::currentDateTime(), spectrum, dataToLine(spectrum, "intensity", type), nullptr));
+        dataTable.append(new Sample{tr("Dark"), index, QDateTime::currentDateTime(), dataToLine(spectrum, "intensity", type), nullptr});
         insertRow(rowCount() - 1);
     }
     else
     {
-        auto &old_dark = data_table[0];
-        delete std::get<3>(old_dark);
-        auto chart = std::get<4>(old_dark)->chart();
-        if (chart != nullptr)
-            chart->removeSeries(std::get<4>(old_dark));
-        delete std::get<4>(old_dark);
-        data_table[0] = std::make_tuple(tr("Dark"), index, QDateTime::currentDateTime(), spectrum, dataToLine(spectrum, "intensity", type), nullptr);
+        delete dataTable[0];
+        dataTable[0] = new Sample{tr("Dark"), index, QDateTime::currentDateTime(), dataToLine(spectrum, "intensity", type), nullptr};
         emit dataChanged(createIndex(0, 0), createIndex(0, 4), QVector<int>({Qt::DisplayRole}));
     }
+}
+
+void DataModel::hideAllSeries()
+{
+    for (auto &sample : dataTable)
+    {
+        sample->intensity->hide();
+        if (sample->absorbance != nullptr)
+            sample->absorbance->hide();
+    }
+    emit dataChanged(createIndex(0, 4), createIndex(rowCount() - 1, 4), QVector<int>{Qt::DisplayRole});
 }

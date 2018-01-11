@@ -2,11 +2,17 @@
 
 #include <QTextStream>
 
-SaveProxy::SaveProxy(QString filename, SaveContent saveContent, SaveFormat saveFormat, QObject *parent)
-    : QObject(parent), file(filename), saveContent(saveContent), saveFormat(saveFormat), stream(&file)
+SaveProxy::SaveProxy(QString filename, int saveContent, SaveFormat saveFormat, QObject *parent)
+    : QObject(parent), file(filename), saveContent(saveContent), saveFormat(saveFormat)
 {
+    // Attention : the sequence of class' initialization list follows
+    //             the sequence of variants' defined sequence in the class declaration
 }
 
+void SaveProxy::setModel(DataModel *model)
+{
+    m_model = model;
+}
 
 void SaveProxy::setSaveFormat(SaveFormat saveFormat)
 {
@@ -16,57 +22,81 @@ void SaveProxy::setSaveFormat(SaveFormat saveFormat)
 void SaveProxy::setSaveContent(int saveContent)
 {
     saveContent = saveContent;
+
 }
 
 void SaveProxy::open()
 {
-    file.open(QIODevice::ReadWrite);
-    //stream->setDevice(&file);
+    file.open(QIODevice::WriteOnly);
 }
 
-void SaveProxy::addAnEntry(QString &name, QList<QPointF> spectrum)
+void SaveProxy::close()
 {
-    if (saveFormat == SaveFormat::Json)
-    {
-    }
-    QStringList strList(name);
-    for (auto &p : spectrum)
-        strList << QString::number(p.y());
-    stream << formatLikeTab(strList) << endl;
     file.commit();
 }
 
-void SaveProxy::addBasicInfo(QList<QPointF> ref, QList<QPointF> dark, QString basicConf)
+void SaveProxy::saveAll()
 {
+    QTextStream stream(&file);
+    switch (saveFormat)
+    {
+    case SaveFormat::TabTxt:
+        if (saveContent & SaveContent::INTENSITY)
+            for (auto i = m_model->dataTable.begin() + 2; i != m_model->dataTable.end(); i++)
+            {
+                stream << (*i)->name <<"-"<<(*i)->index<< "\t";
+                for (auto &point : (*i)->intensity->pointsVector())
+                    stream << point.y() << "\t";
+                stream << (*i)->dateTime.toString() << "\tIntensity" << endl;
+            }
+        if (saveContent & SaveContent::ABORBANCE)
+            for (auto i = m_model->dataTable.begin() + 2; i != m_model->dataTable.end(); i++)
+            {
+                stream << (*i)->name <<"-"<<(*i)->index<< "\t";
+                for (auto &point : (*i)->absorbance->pointsVector())
+                    stream << point.y() << "\t";
+                stream << (*i)->dateTime.toString() << "\tAbsorbance" << endl;
+            }
+        break;
+    case SaveFormat::Csv:
+        // TO DO
+        break;
+    case SaveFormat::Json:
+        // TO DO
+        break;
+    default:
+        break;
+    }
+}
+
+void SaveProxy::addBasicInfo(QString basicConf)
+{
+    QTextStream stream(&file);
     if (saveFormat == SaveFormat::Json)
     {
     }
+
     stream << basicConf << endl;
-    QStringList strList("Wavelength");
-    for (auto &p : ref)
-        strList << QString::number(p.x());
-    stream << formatLikeTab(strList) << endl;
-    strList.clear();
+    stream << "Wavelength\t";
+    for (auto &point : m_model->dataTable.at(0)->intensity->pointsVector())
+        stream << point.x() << "\t";
+    stream << "DateTime\tKind" << endl;
     if (saveContent & SaveContent::DARK)
     {
-        for (auto &p : dark)
-            strList << QString::number(p.y());
-        stream << formatLikeTab(strList) << endl;
+        stream << m_model->dataTable.at(0)->name << "\t";
+        for (auto &point : m_model->dataTable.at(0)->intensity->pointsVector())
+            stream << point.y() << "\t";
+        stream << m_model->dataTable.at(0)->dateTime.toString() << "\tIntensity" << endl;
     }
     if (saveContent & SaveContent::REFERENCE)
     {
-        for (auto &p : ref)
-            strList << QString::number(p.y());
-        stream << formatLikeTab(strList) << endl;
+        stream << m_model->dataTable.at(1)->name << "\t";
+        for (auto &point : m_model->dataTable.at(1)->intensity->pointsVector())
+            stream << point.y() << "\t";
+        stream << m_model->dataTable.at(1)->dateTime.toString() << "\tIntensity" << endl;
     }
-    file.commit();
 }
 
-QString SaveProxy::formatBasicInfo(QStringList &list)
-{
-    //For Later extension
-    return QString();
-}
 
 QString SaveProxy::formatLikeTab(QStringList &list)
 {

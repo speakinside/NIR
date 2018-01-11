@@ -3,12 +3,14 @@
 
 #include <QAbstractTableModel>
 #include <QVector>
+#include <QString>
 #include <QPointF>
 #include <QLabel>
 #include <QDatetime>
 #include <QVariant>
 #include <QLineSeries>
 #include <QSplineSeries>
+#include <QChart>
 #include <QList>
 #include <tuple>
 
@@ -16,10 +18,21 @@ using namespace QtCharts;
 
 class DeviceInterface;
 
+struct Sample
+{
+  QString name;
+  int index;
+  QDateTime dateTime;
+  QXYSeries *intensity;
+  QXYSeries *absorbance;
+  ~Sample();
+};
+
 class DataModel : public QAbstractTableModel
 {
   Q_OBJECT
-      DeviceInterface *device;
+  DeviceInterface *device;
+
 public:
   explicit DataModel(DeviceInterface *device, QObject *parent = nullptr);
   int rowCount(const QModelIndex &parent = QModelIndex()) const;
@@ -36,17 +49,16 @@ public:
   QList<QPointF> *intToAbs(const QList<QPointF> *intSpectra);
   void changeVisible(const QModelIndex &index);
 
-  //tuple<name,index,time,data,intensity series,absorbance series>
-  QList<std::tuple<QString, int, QDateTime, QList<QPointF> *, QXYSeries *, QXYSeries *>> data_table;
+  QList<Sample *> dataTable;
 signals:
   void newSeriesCreated(QAbstractSeries *, QString);
   void noRefAndDark();
   void noConnection();
 public slots:
-  void save();
   void getSpectrum(QString name, int index, QAbstractSeries::SeriesType type = QAbstractSeries::SeriesTypeLine);
   void getRef(int index, QAbstractSeries::SeriesType type = QAbstractSeries::SeriesTypeLine);
   void getDark(int index, QAbstractSeries::SeriesType type = QAbstractSeries::SeriesTypeLine);
+  void hideAllSeries();
 };
 
 #endif // DATAMODEL_H

@@ -7,6 +7,7 @@
 #include <QStringList>
 #include <QTextStream>
 #include <QPointF>
+#include "datamodel.h"
 
 class SaveProxy : public QObject
 {
@@ -28,19 +29,21 @@ class SaveProxy : public QObject
         INTENSITY = 0b1000,
         ALL = 0b111111
     };
-    SaveProxy(QString filename, SaveContent saveContent = SaveContent::ALL, SaveFormat saveFormat = SaveFormat::TabTxt, QObject *parent = nullptr);
+
+    SaveProxy(QString filename, int saveContent = SaveContent::ALL, SaveFormat saveFormat = SaveFormat::TabTxt, QObject *parent = nullptr);
+    void setModel(DataModel *model);
     void setSaveFormat(SaveFormat saveFormat);
     void setSaveContent(int saveContent = SaveContent::ALL);
     void open();
-    void addAnEntry(QString &name, QList<QPointF> spectrum);
-    void addBasicInfo(QList<QPointF> ref, QList<QPointF> dark, QString basicConf);
+    void close();
+    void saveAll();
+    void addBasicInfo(QString basicConf);
 
   private:
     QSaveFile file;
-    QTextStream stream;
     SaveFormat saveFormat;
     int saveContent;
-    QString formatBasicInfo(QStringList &list);
+    DataModel *m_model;
     QString formatLikeTab(QStringList &list);
     QString formatLikeJason(QStringList &list);
     QString formatLikeCsv(QStringList &list);

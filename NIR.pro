@@ -35,8 +35,6 @@ SOURCES += \
     Gui/TabArea/measurebox.cpp \
     Gui/TabArea/deviceconditionbox.cpp \
     Gui/TabArea/saveconfbox.cpp \
-    Core/modeldelegate.cpp \
-    Gui/SpectraArea/spectrachart.cpp \
     Gui/Dialogs/aboutdialog.cpp \
     Gui/Dialogs/measuredialog.cpp \
     Gui/Dialogs/connectdialog.cpp \
@@ -56,8 +54,6 @@ HEADERS += \
     Gui/TabArea/measurebox.h \
     Gui/TabArea/deviceconditionbox.h \
     Gui/TabArea/saveconfbox.h \
-    Core/modeldelegate.h \
-    Gui/SpectraArea/spectrachart.h \
     Gui/Dialogs/aboutdialog.h \
     Gui/Dialogs/measuredialog.h \
     Gui/Dialogs/connectdialog.h \

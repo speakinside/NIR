@@ -1,6 +1,6 @@
 #pragma once
 #include "datamodel.h"
-#include "savemethods.h"
+#include "saveproxy.h"
 #include <plog/Log.h>
 #ifdef USE_FAKE_DEVICE
 #include "fakedevice.h"
@@ -12,7 +12,6 @@ struct Core
 {
     DataModel *dataModel;
     DeviceInterface *deviceInterface;
-    SaveMethods *saveMethods;
     Core()
     {
 #ifdef USE_FAKE_DEVICE
@@ -22,12 +21,10 @@ struct Core
         deviceInterface = new DeviceInterface;
 #endif
         dataModel = new DataModel(deviceInterface);
-        saveMethods = new SaveMethods;
     }
     ~Core()
     {
         delete deviceInterface;
         delete dataModel;
-        delete saveMethods;
     }
 };

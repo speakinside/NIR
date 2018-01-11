@@ -58,16 +58,24 @@ void MainWindow::connectDevice()
 {
     static ConnectDialog *dialog = new ConnectDialog(this);
     dialog->exec();
-    if(dialog->result() == QDialog::Rejected)
+    if (dialog->result() == QDialog::Rejected)
         return;
-    core->deviceInterface->openDevice(dialog->getPortName(),dialog->getBaudRate());
-    LOG_DEBUG << QString("PortName:%1 BaudRate: %2").arg(dialog->getPortName(),QString::number(dialog->getBaudRate()));
+    core->deviceInterface->openDevice(dialog->getPortName(), dialog->getBaudRate());
+    LOG_DEBUG << QString("PortName:%1 BaudRate: %2").arg(dialog->getPortName(), QString::number(dialog->getBaudRate()));
 }
 
 void MainWindow::saveData()
 {
     static auto dialog = new SaveDialog(this);
     dialog->exec();
+    if (dialog->result() == QDialog::Rejected)
+        return;
+    SaveProxy save(dialog->getFilename(), dialog->getSaveContent(), dialog->getSaveFormat());
+    save.setModel(core->dataModel);
+    save.open();
+    save.addBasicInfo("");
+    save.saveAll();
+    save.close();
 }
 
 void MainWindow::measureDark()
@@ -84,31 +92,23 @@ void MainWindow::measureSpectrum()
 {
     static MeasureDialog *dialog = new MeasureDialog(this);
     dialog->exec();
-    if(dialog->result() == QDialog::Rejected)
+    if (dialog->result() == QDialog::Rejected)
         return;
     QString name = dialog->getSampleName();
-    if(name.isEmpty())
+    if (name.isEmpty())
         return;
     int repeatTimes = dialog->getRepeatTimes();
-    QProgressDialog progress("Measure Progress","Abort",0,repeatTimes,this);
-        progress.setMinimumDuration(0);
-            progress.setWindowModality(Qt::WindowModal);
+    QProgressDialog progress("Measure Progress", "Abort", 0, repeatTimes, this);
+    progress.setMinimumDuration(0);
+    progress.setWindowModality(Qt::WindowModal);
     progress.setValue(0);
-    progress.setValue(1);
-    //progress.setBar(new QProgressBar);
-
-
-    //progress.show();
-    for(int i=1;i<=repeatTimes;i++)
+    for (int i = 1; i <= repeatTimes; i++)
     {
-        core->dataModel->getSpectrum(name,i);
+        core->dataModel->getSpectrum(name, i);
         progress.setValue(i);
+        if (progress.wasCanceled())
+            break;
     }
-    /*
-    QString name = QInputDialog::getText(this, tr("Before Measure"), tr("Sample Name:"));
-    if (!name.isEmpty())
-        core->dataModel->getSpectrum(name, 1);
-    */
 }
 
 QMenuBar *MainWindow::initMenuBar()
@@ -118,27 +118,27 @@ QMenuBar *MainWindow::initMenuBar()
 
     auto startMenu = new QMenu(tr("Start"));
     //TO DO
-    menuActionMap.insert("start-connect",startMenu->addAction(tr("Connect")));
-    menuActionMap.insert("start-save",startMenu->addAction(tr("Save ..."),this,&MainWindow::saveData));
+    menuActionMap.insert("start-connect", startMenu->addAction(tr("Connect")));
+    menuActionMap.insert("start-save", startMenu->addAction(tr("Save Current Data"), this, &MainWindow::saveData));
 
     auto confMenu = new QMenu(tr("Configure"));
     //TO DO
-    menuActionMap.insert("conf-blabla",confMenu->addAction(tr("blabla")));
+    menuActionMap.insert("conf-blabla", confMenu->addAction(tr("blabla")));
 
     auto spectraMenu = new QMenu(tr("Spectra"));
     //TO DO
 
-    menuActionMap.insert("spectra-setToDefaultScale",spectraMenu->addAction(tr("set to default scale")));
-    menuActionMap.insert("spectra-saveCurrentImage",spectraMenu->addAction(tr("save current image")));
+    menuActionMap.insert("spectra-setToDefaultScale", spectraMenu->addAction(tr("set to default scale")));
+    menuActionMap.insert("spectra-saveCurrentImage", spectraMenu->addAction(tr("save current image")));
 
     auto helpMenu = new QMenu(tr("Help"));
     //Build "About" menu
-    menuActionMap.insert("help-aboutNIR",helpMenu->addAction(tr("About NIR")));
-    menuActionMap.insert("help-aboutPlog",helpMenu->addAction(tr("About Plog"),[this]{
+    menuActionMap.insert("help-aboutNIR", helpMenu->addAction(tr("About NIR")));
+    menuActionMap.insert("help-aboutPlog", helpMenu->addAction(tr("About Plog"), [this] {
         QFile f(":/text/res/aboutPlog.txt");
         f.open(QIODevice::ReadOnly);
-        QMessageBox::about(this,tr("About plog"),f.readAll());}));
-    menuActionMap.insert("help-aboutQt",helpMenu->addAction(tr("About Qt"), [this]{LOG_DEBUG<<"Trigger \"About Qt\" Page"; QMessageBox::aboutQt(this); }));
+        QMessageBox::about(this,tr("About plog"),f.readAll()); }));
+    menuActionMap.insert("help-aboutQt", helpMenu->addAction(tr("About Qt"), [this] {LOG_DEBUG<<"Trigger \"About Qt\" Page"; QMessageBox::aboutQt(this); }));
 
     menuBar->addMenu(startMenu);
     menuBar->addMenu(confMenu);
@@ -206,14 +206,14 @@ void MainWindow::connectEverything()
 {
     LOG_DEBUG << "Build Connections";
     // MenuBar
-    connect(menuActionMap["start-connect"],&QAction::triggered,actionMap["connect"],&QAction::trigger);
+    connect(menuActionMap["start-connect"], &QAction::triggered, actionMap["connect"], &QAction::trigger);
     // ToolBar
-    connect(actionMap["connect"],&QAction::triggered,this,&MainWindow::connectDevice);
+    connect(actionMap["connect"], &QAction::triggered, this, &MainWindow::connectDevice);
     connect(actionMap["dark"], &QAction::triggered, this, &MainWindow::measureDark);
     connect(actionMap["ref"], &QAction::triggered, this, &MainWindow::measureRef);
     connect(actionMap["spectra"], &QAction::triggered, this, &MainWindow::measureSpectrum);
     connect(actionMap["spectraFast"], &QAction::triggered, [this](bool) { this->core->dataModel->getSpectrum(tr("test"), 1); });
-    connect(actionMap["clearChart"], &QAction::triggered, spectraView, &SpectraView::hideAllSeries);
+    connect(actionMap["clearChart"], &QAction::triggered, core->dataModel, &DataModel::hideAllSeries);
     connect(actionMap["delSelectedEntry"], &QAction::triggered, [this] {
         auto list = QList<QPersistentModelIndex>();
         for (auto &i : sampleTable->selectedIndexes())
@@ -224,7 +224,9 @@ void MainWindow::connectEverything()
                 core->dataModel->removeRow(i.row());
     });
     connect(actionMap["delAll"], &QAction::triggered, [this] { core->dataModel->removeRows(2, core->dataModel->rowCount() - 2); });
+
     {
+        // Two exclusive actions
         auto chartActionGroup = new QActionGroup(this);
         chartActionGroup->addAction(actionMap["absorbance"]);
         chartActionGroup->addAction(actionMap["intensity"]);
@@ -238,14 +240,14 @@ void MainWindow::connectEverything()
     });
     connect(sampleTable->verticalHeader(), &QHeaderView::sectionDoubleClicked,
             [this](int logicalIndex) {
-                auto color = QColorDialog::getColor(std::get<4>(core->dataModel->data_table.at(logicalIndex))->color(), this, tr("Choose color."));
+                auto color = QColorDialog::getColor(core->dataModel->headerData(logicalIndex, Qt::Vertical, Qt::UserRole).value<QColor>(), this, tr("Choose color."));
                 if (!color.isValid())
                     return;
                 core->dataModel->setHeaderData(logicalIndex, Qt::Vertical, color, Qt::DecorationRole);
             });
     //contralPanel
-    connect(core->deviceInterface,&DeviceInterface::portConnected,controlPanel->deviceConditionBox,&DeviceConditionBox::setConnectivity);
-    connect(core->deviceInterface,&DeviceInterface::portDisconnected,controlPanel->deviceConditionBox,&DeviceConditionBox::setLost);
+    connect(core->deviceInterface, &DeviceInterface::portConnected, controlPanel->deviceConditionBox, &DeviceConditionBox::setConnectivity);
+    connect(core->deviceInterface, &DeviceInterface::portDisconnected, controlPanel->deviceConditionBox, &DeviceConditionBox::setLost);
     //Measure Logic
     connect(core->dataModel, &DataModel::newSeriesCreated, spectraView, &SpectraView::addNewSeriesToChart);
     connect(core->dataModel, &DataModel::noRefAndDark,
