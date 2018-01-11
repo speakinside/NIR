@@ -20,6 +20,7 @@ public:
   void keyPressEvent(QKeyEvent *event);
   void mouseReleaseEvent(QMouseEvent *event);
   void contextMenuEvent(QContextMenuEvent *event);
+  void wheelEvent(QWheelEvent *event);
 
 private:
   QChart *absorbance;

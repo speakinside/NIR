@@ -27,6 +27,7 @@
 #include <QProgressDialog>
 #include <QProgressBar>
 #include <QFile>
+#include <QPixmap>
 #include <Qt>
 
 MainWindow::MainWindow(Core *core, QWidget *parent) : core(core), QMainWindow(parent)
@@ -137,7 +138,14 @@ QMenuBar *MainWindow::initMenuBar()
     menuActionMap.insert("help-aboutPlog", helpMenu->addAction(tr("About Plog"), [this] {
         QFile f(":/text/res/aboutPlog.txt");
         f.open(QIODevice::ReadOnly);
-        QMessageBox::about(this,tr("About plog"),f.readAll()); }));
+        QMessageBox msg(this);
+        QPixmap pix(":/icons/res/githubIcon.svg");
+        msg.setIconPixmap(pix);
+        msg.setWindowTitle(tr("About Plog"));
+        msg.setText(f.readAll());
+        msg.exec();
+        f.close();
+    }));
     menuActionMap.insert("help-aboutQt", helpMenu->addAction(tr("About Qt"), [this] {LOG_DEBUG<<"Trigger \"About Qt\" Page"; QMessageBox::aboutQt(this); }));
 
     menuBar->addMenu(startMenu);

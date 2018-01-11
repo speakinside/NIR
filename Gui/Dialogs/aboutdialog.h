@@ -1,10 +1,9 @@
 #ifndef ABOUTDIALOG_H
 #define ABOUTDIALOG_H
 
-#include <QDialog>
+#include <QMessageBox>
 
-
-class AboutDialog : public QWidget
+class AboutDialog : public QMessageBox
 {
     Q_OBJECT
 public:

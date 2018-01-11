@@ -5,6 +5,7 @@
         <file>res/ref.png</file>
         <file>res/spectra.png</file>
         <file>res/connect2.png</file>
+        <file>res/githubIcon.svg</file>
     </qresource>
     <qresource prefix="/text">
         <file>res/aboutPlog.txt</file>

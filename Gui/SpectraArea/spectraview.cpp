@@ -78,13 +78,21 @@ void SpectraView::contextMenuEvent(QContextMenuEvent *event)
     QChartView::contextMenuEvent(event);
 }
 
+void SpectraView::wheelEvent(QWheelEvent *event)
+{
+    if(event->delta() > 0)
+    chart()->zoomIn();
+    else
+        chart()->zoomOut();
+}
+
 QChart *SpectraView::initAbsChart()
 {
     auto wavelength = new QValueAxis();
     auto absorbance = new QValueAxis();
     auto chart = new QChart();
     wavelength->setRange(1200, 1900);
-    absorbance->setRange(0, 1);
+    absorbance->setRange(0, 0.01);
     wavelength->setMinorTickCount(4);
     absorbance->setMinorTickCount(1);
     wavelength->setTitleText("Wavelength(nm)");
