@@ -1,0 +1,9 @@
+<html>
+<h><b>NIR</b> </h>
+<p>
+NIR is a light-weight program for near infra-red device manipulating.
+</p>
+<p>
+Learn more on Github: <a href="https://github.com/speakinside/NIR">speakinside/NIR/plog</a>
+</p>
+</html>

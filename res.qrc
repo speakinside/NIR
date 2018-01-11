@@ -9,5 +9,6 @@
     </qresource>
     <qresource prefix="/text">
         <file>res/aboutPlog.txt</file>
+        <file>res/aboutNIR.txt</file>
     </qresource>
 </RCC>
