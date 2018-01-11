@@ -1,10 +1,9 @@
 #include "controlpanel.h"
-#include "measurebox.h"
-#include "deviceconditionbox.h"
 
 #include <QVBoxLayout>
+#include <QLabel>
 
-ControlPanel::ControlPanel(QWidget *parent)
+ControlPanel::ControlPanel(QWidget *parent):QTabWidget(parent)
 {
     setMaximumWidth(400);
     auto basicConf = createBasicConf();
@@ -27,6 +26,8 @@ QWidget *ControlPanel::createBasicConf()
 
 QWidget *ControlPanel::createAdvancedConf()
 {
-    auto w = new QWidget();
+    auto w = new QLabel("<b>没有<\b>");
+    w->setScaledContents(true);
+    w->setAlignment(Qt::AlignCenter);
     return w;
 }

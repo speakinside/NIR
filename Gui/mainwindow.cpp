@@ -4,7 +4,8 @@
 #include "SpectraArea/spectraview.h"
 #include "Dialogs/measuredialog.h"
 #include "Dialogs/connectdialog.h"
-#include "../Core/init.h"
+#include "Dialogs/savedialog.h"
+#include "Core/init.h"
 
 #include <plog/Log.h>
 #include <QGridLayout>
@@ -57,6 +58,16 @@ void MainWindow::connectDevice()
 {
     static ConnectDialog *dialog = new ConnectDialog(this);
     dialog->exec();
+    if(dialog->result() == QDialog::Rejected)
+        return;
+    core->deviceInterface->openDevice(dialog->getPortName(),dialog->getBaudRate());
+    LOG_DEBUG << QString("PortName:%1 BaudRate: %2").arg(dialog->getPortName(),QString::number(dialog->getBaudRate()));
+}
+
+void MainWindow::saveData()
+{
+    static auto dialog = new SaveDialog(this);
+    dialog->exec();
 }
 
 void MainWindow::measureDark()
@@ -107,25 +118,27 @@ QMenuBar *MainWindow::initMenuBar()
 
     auto startMenu = new QMenu(tr("Start"));
     //TO DO
-    startMenu->addAction(tr("Connect"));
+    menuActionMap.insert("start-connect",startMenu->addAction(tr("Connect")));
+    menuActionMap.insert("start-save",startMenu->addAction(tr("Save ..."),this,&MainWindow::saveData));
 
     auto confMenu = new QMenu(tr("Configure"));
     //TO DO
-    confMenu->addAction(tr("blabla"));
+    menuActionMap.insert("conf-blabla",confMenu->addAction(tr("blabla")));
 
     auto spectraMenu = new QMenu(tr("Spectra"));
     //TO DO
-    spectraMenu->addAction(tr("set to default scale"));
-    spectraMenu->addAction(tr("save current image"));
+
+    menuActionMap.insert("spectra-setToDefaultScale",spectraMenu->addAction(tr("set to default scale")));
+    menuActionMap.insert("spectra-saveCurrentImage",spectraMenu->addAction(tr("save current image")));
 
     auto helpMenu = new QMenu(tr("Help"));
     //Build "About" menu
-    helpMenu->addAction(tr("About NIR"));
-    helpMenu->addAction(tr("About plog"),[this]{
+    menuActionMap.insert("help-aboutNIR",helpMenu->addAction(tr("About NIR")));
+    menuActionMap.insert("help-aboutPlog",helpMenu->addAction(tr("About Plog"),[this]{
         QFile f(":/text/res/aboutPlog.txt");
         f.open(QIODevice::ReadOnly);
-        QMessageBox::about(this,tr("About plog"),f.readAll());});
-    helpMenu->addAction(tr("About Qt"), [this]{LOG_DEBUG<<"Trigger \"About Qt\" Page"; QMessageBox::aboutQt(this); });
+        QMessageBox::about(this,tr("About plog"),f.readAll());}));
+    menuActionMap.insert("help-aboutQt",helpMenu->addAction(tr("About Qt"), [this]{LOG_DEBUG<<"Trigger \"About Qt\" Page"; QMessageBox::aboutQt(this); }));
 
     menuBar->addMenu(startMenu);
     menuBar->addMenu(confMenu);
@@ -192,7 +205,8 @@ ControlPanel *MainWindow::initControlPanel()
 void MainWindow::connectEverything()
 {
     LOG_DEBUG << "Build Connections";
-
+    // MenuBar
+    connect(menuActionMap["start-connect"],&QAction::triggered,actionMap["connect"],&QAction::trigger);
     // ToolBar
     connect(actionMap["connect"],&QAction::triggered,this,&MainWindow::connectDevice);
     connect(actionMap["dark"], &QAction::triggered, this, &MainWindow::measureDark);
@@ -229,9 +243,13 @@ void MainWindow::connectEverything()
                     return;
                 core->dataModel->setHeaderData(logicalIndex, Qt::Vertical, color, Qt::DecorationRole);
             });
-
+    //contralPanel
+    connect(core->deviceInterface,&DeviceInterface::portConnected,controlPanel->deviceConditionBox,&DeviceConditionBox::setConnectivity);
+    connect(core->deviceInterface,&DeviceInterface::portDisconnected,controlPanel->deviceConditionBox,&DeviceConditionBox::setLost);
     //Measure Logic
     connect(core->dataModel, &DataModel::newSeriesCreated, spectraView, &SpectraView::addNewSeriesToChart);
     connect(core->dataModel, &DataModel::noRefAndDark,
             [this] { QMessageBox::warning(this, tr("Warning"), tr("Measure Refference and Dark spectra before sample measurement!"), QMessageBox::Ok); });
+    connect(core->dataModel, &DataModel::noConnection,
+            [this] { QMessageBox::warning(this, tr("Warning"), tr("Connect Device before sample measurement!"), QMessageBox::Ok); });
 }

@@ -2,69 +2,161 @@
 
 #include <QTime>
 #include <QTimer>
+#include <regex>
+#include <QTextStream>
+#include <QByteArray>
 #include <plog/Log.h>
 
-DeviceInterface::DeviceInterface(QObject *parent) : QObject(parent)
+DeviceInterface::DeviceInterface(QObject *parent) : QObject(parent), deviceConnectivity(false)
 {
     //TO DO:More human interface
     device = new QSerialPort(this);
-    wavelength = QList<double>({841.7, 850, 858.2, 866.4, 874.6, 882.9, 891.1, 899.3, 907.6, 915.8, 924, 932.3, 940.5, 948.7, 957, 965.2, 973.4, 981.7, 989.9, 998.1, 1006.4, 1014.6, 1022.9, 1031.1, 1039.4, 1047.6, 1055.8, 1064.1, 1072.3, 1080.6, 1088.8, 1097.1, 1105.3, 1113.6, 1121.8, 1130.1, 1138.3, 1146.6, 1154.8, 1163.1, 1171.4, 1179.6, 1187.9, 1196.1, 1204.4, 1212.7, 1220.9, 1229.2, 1237.4, 1245.7, 1254, 1262.2, 1270.5, 1278.8, 1287, 1295.3, 1303.6, 1311.8, 1320.1, 1328.4, 1336.6, 1344.9, 1353.2, 1361.5, 1369.7, 1378, 1386.3, 1394.6, 1402.9, 1411.1, 1419.4, 1427.7, 1436, 1444.3, 1452.5, 1460.8, 1469.1, 1477.4, 1485.7, 1494, 1502.3, 1510.5, 1518.8, 1527.1, 1535.4, 1543.7, 1552, 1560.3, 1568.6, 1576.9, 1585.2, 1593.5, 1601.8, 1610.1, 1618.4, 1626.7, 1635, 1643.3, 1651.6, 1659.9, 1668.2, 1676.5, 1684.8, 1693.1, 1701.4, 1709.7, 1718, 1726.3, 1734.7, 1743, 1751.3, 1759.6, 1767.9, 1776.2, 1784.5, 1792.8, 1801.2, 1809.5, 1817.8, 1826.1, 1834.4, 1842.8, 1851.1, 1859.4, 1867.7, 1876.1, 1884.4, 1892.7});
+    connect(this, &DeviceInterface::portDisconnected, this, &DeviceInterface::setLost);
+    connect(this, &DeviceInterface::portConnected, this, &DeviceInterface::setConnectted);
 }
 
-bool DeviceInterface::openDevice()
+void DeviceInterface::openDevice(const QString &portName, QSerialPort::BaudRate baudRate)
 {
-    return true;
+    if (device->isOpen())
+        emit errorOccur(QSerialPort::OpenError);
+    device->setPortName(portName);
+    device->setBaudRate(baudRate);
+    if (!device->open(QIODevice::ReadWrite))
+    {
+        emit errorOccur(device->error());
+        device->clearError();
+    }
+    else
+    {
+        emit portConnected(portName);
+    }
 }
 
-void DeviceInterface::changeConf(const QString &name, const QString &value)
-{
-    LOG_INFO << "Change Configure: set " << name << " to " << value;
-    DeviceConfChanged = true;
-    deviceConf[name] = value;
-}
-
-void DeviceInterface::sendConf()
-{
-    LOG_INFO << "Send Configuration";
-    DeviceConfChanged = false;
-}
-
-void DeviceInterface::getRef(QList<QPointF> *spectrum)
+void DeviceInterface::getRef(QList<QPointF> *spectrum, int integration_time, int scan_times)
 {
     LOG_INFO << "Try to get Ref";
     emit startMeasuring();
-    auto ref = QList<double>({4620, 5564, 6487, 7479, 8541, 9660, 10902, 12261, 13881, 16309, 19582, 22551, 24464, 25667, 26456, 27185, 28022, 28965, 30009, 31061, 32143, 33063, 33948, 34623, 35222, 35620, 35968, 36123, 36267, 36583, 36959, 37439, 38066, 38721, 39473, 40308, 41083, 41804, 42555, 43183, 43650, 43997, 44304, 44470, 44584, 44605, 44558, 44476, 44481, 44456, 44448, 44471, 44539, 44613, 44717, 44877, 44995, 45204, 45362, 45576, 45717, 45600, 44792, 43944, 44155, 43964, 43739, 43541, 43185, 43024, 42980, 42969, 42906, 42879, 42725, 42454, 42166, 41899, 41606, 41266, 40950, 40656, 40396, 40040, 39726, 39356, 38972, 38566, 38250, 37904, 37547, 37103, 36646, 36097, 35455, 34766, 34002, 33184, 32329, 31301, 29837, 27493, 23526, 18571, 14197, 11162, 9268, 8079, 7262, 6714, 6282, 5963, 5723, 5533, 5371, 5251, 5154, 5074, 5018, 4978, 4960, 4998, 5147, 5375, 5613, 5781, 5852, 5873});
-    auto x = wavelength.begin();
-    auto y = ref.begin();
-    while (x != wavelength.end())
-        *spectrum << QPointF(*x++, *y++);
+    device->flush();
+    device->write(QString("*meas:light %0 %1 7\r").arg(integration_time).arg(scan_times).toLocal8Bit());
+    QByteArray data("\0");
+    for (int i = 0; i < 6; i++)
+    {
+        data += device->readAll();
+        LOG_DEBUG << "Data Size:" << data.size();
+        device->waitForReadyRead(integration_time * scan_times);
+    }
+    LOG_DEBUG << "Data:" << data;
+    data = data.trimmed();
+    data.remove(0, 2);
+    auto strList = data.split('\r');
+    for (auto &str : strList)
+    {
+        auto split = str.split('\t');
+        spectrum->append(QPointF(split[0].trimmed().toDouble(), split[1].trimmed().toDouble()));
+    }
     emit endMeasuring();
 }
 
-void DeviceInterface::getDark(QList<QPointF> *spectrum)
+void DeviceInterface::getDark(QList<QPointF> *spectrum, int integration_time, int scan_times)
 {
     LOG_INFO << "Try to get Dark";
     emit startMeasuring();
-    auto dark = QList<double>({699, 772, 772, 779, 779, 773, 777, 775, 772, 774, 773, 771, 775, 776, 767, 768, 781, 770, 771, 769, 777, 770, 767, 769, 773, 769, 777, 775, 773, 774, 775, 769, 774, 777, 771, 777, 768, 775, 776, 767, 775, 770, 768, 770, 769, 776, 772, 770, 771, 777, 774, 774, 779, 771, 775, 775, 771, 774, 776, 771, 772, 770, 778, 771, 779, 774, 777, 777, 773, 780, 774, 775, 774, 781, 774, 773, 779, 774, 776, 773, 779, 772, 777, 773, 774, 772, 771, 778, 769, 773, 775, 772, 770, 775, 775, 770, 772, 776, 776, 779, 772, 775, 772, 777, 776, 775, 773, 773, 767, 777, 770, 771, 774, 772, 772, 771, 774, 771, 769, 773, 773, 771, 775, 774, 772, 774, 772, 773});
-    auto x = wavelength.begin();
-    auto y = dark.begin();
-    while (x != wavelength.end())
-        *spectrum << QPointF(*x++, *y++);
+    device->flush();
+    device->write(QString("*meas:dark %0 %1 7\r").arg(integration_time).arg(scan_times).toLocal8Bit());
+    QByteArray data("\0");
+    for (int i = 0; i < 6; i++)
+    {
+        data += device->readAll();
+        LOG_DEBUG << "Data Size:" << data.size();
+        device->waitForReadyRead(integration_time * scan_times);
+    }
+    LOG_DEBUG << "Data:" << data;
+    data = data.trimmed();
+    data.remove(0, 2);
+    auto strList = data.split('\r');
+    for (auto &str : strList)
+    {
+        auto split = str.split('\t');
+        spectrum->append(QPointF(split[0].trimmed().toDouble(), split[1].trimmed().toDouble()));
+    }
     emit endMeasuring();
 }
 
-void DeviceInterface::getSpectrum(QList<QPointF> *spectrum)
+void DeviceInterface::getSpectrum(QList<QPointF> *spectrum, int integration_time, int scan_times)
 {
     LOG_INFO << "Try to get Spectrum";
     emit startMeasuring();
-    qsrand(QTime(0, 0, 0).secsTo(QTime::currentTime()));
-    auto ref = QList<double>({4620, 5564, 6487, 7479, 8541, 9660, 10902, 12261, 13881, 16309, 19582, 22551, 24464, 25667, 26456, 27185, 28022, 28965, 30009, 31061, 32143, 33063, 33948, 34623, 35222, 35620, 35968, 36123, 36267, 36583, 36959, 37439, 38066, 38721, 39473, 40308, 41083, 41804, 42555, 43183, 43650, 43997, 44304, 44470, 44584, 44605, 44558, 44476, 44481, 44456, 44448, 44471, 44539, 44613, 44717, 44877, 44995, 45204, 45362, 45576, 45717, 45600, 44792, 43944, 44155, 43964, 43739, 43541, 43185, 43024, 42980, 42969, 42906, 42879, 42725, 42454, 42166, 41899, 41606, 41266, 40950, 40656, 40396, 40040, 39726, 39356, 38972, 38566, 38250, 37904, 37547, 37103, 36646, 36097, 35455, 34766, 34002, 33184, 32329, 31301, 29837, 27493, 23526, 18571, 14197, 11162, 9268, 8079, 7262, 6714, 6282, 5963, 5723, 5533, 5371, 5251, 5154, 5074, 5018, 4978, 4960, 4998, 5147, 5375, 5613, 5781, 5852, 5873});
-    auto i = ref.begin();
-    auto x = wavelength.begin();
-    while (x != wavelength.end())
-        *spectrum << QPointF(*x++, (double)qrand() / RAND_MAX * *i++);
-    static QTimer *timer = new QTimer(this);
-    timer->start(1e3);
-    while(timer->remainingTime());
+    device->flush();
+    device->write(QString("*meas:light %0 %1 7\r").arg(integration_time).arg(scan_times).toLocal8Bit());
+    QByteArray data("\0");
+    for (int i = 0; i < 6; i++)
+    {
+        data += device->readAll();
+        LOG_DEBUG << "Data Size:" << data.size();
+        device->waitForReadyRead(integration_time * scan_times);
+    }
+    LOG_DEBUG << "Data:" << data;
+    data = data.trimmed();
+    data.remove(0, 2);
+    auto strList = data.split('\r');
+    for (auto &str : strList)
+    {
+        auto split = str.split('\t');
+        spectrum->append(QPointF(split[0].trimmed().toDouble(), split[1].trimmed().toDouble()));
+    }
     emit endMeasuring();
+}
+
+double DeviceInterface::getGainFactor()
+{
+    // Return the amplification factor of the AD-converter (Range = 1.5 till 5.5).
+    // This value is factory adjusted to 1.5
+    device->flush();
+    device->write(QByteArray("*para:gain?\r"));
+    device->waitForReadyRead(100);
+    QByteArray res = device->readAll();
+    auto gainFactor = res.split(':').back().trimmed().toDouble();
+    return gainFactor;
+}
+
+bool DeviceInterface::setGainFactor(double gainFactor)
+{
+    device->flush();
+    device->write(QByteArray("*para:gain ").append(QByteArray::number(gainFactor)).append('\r'));
+    device->waitForBytesWritten();
+    return true;
+}
+
+bool DeviceInterface::getGainDetector()
+{
+    device->flush();
+    device->write(QByteArray("*para:pdag?\r"));
+    device->waitForReadyRead(100);
+    QByteArray res = device->readAll();
+    int gainDetector = res.split(':').back().trimmed().toInt();
+    return gainDetector == 0 ? false : true;
+}
+
+bool DeviceInterface::setGainDetector(bool high)
+{
+    device->flush();
+    device->write(QByteArray("*para:pdag ").append(high ? "1\r" : "0\r"));
+    device->waitForBytesWritten();
+    return true;
+}
+
+
+bool DeviceInterface::isConnected()
+{
+    return deviceConnectivity;
+}
+
+void DeviceInterface::setLost()
+{
+    deviceConnectivity = false;
+}
+
+void DeviceInterface::setConnectted()
+{
+    deviceConnectivity = true;
 }

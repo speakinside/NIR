@@ -4,8 +4,9 @@
 #include <QTabWidget>
 #include <QGroupBox>
 
-class DeviceConditionBox;
-class MeasureBox;
+#include"deviceconditionbox.h"
+#include"measurebox.h"
+
 
 class ControlPanel : public QTabWidget
 {

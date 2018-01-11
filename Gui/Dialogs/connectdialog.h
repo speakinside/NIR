@@ -11,6 +11,7 @@
 
 class ConnectDialog :public QDialog
 {
+    Q_OBJECT
 private:
     QComboBox *comSerial;
     QComboBox *baudrate;

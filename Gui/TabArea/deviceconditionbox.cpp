@@ -27,3 +27,15 @@ DeviceConditionBox::DeviceConditionBox(QWidget *parent): QGroupBox(parent)
     tableWidget->setCellWidget(3,0,new QLabel(tr("Refference Spectrum:")));
     tableWidget->setCellWidget(3,1,new QLabel(tr("Not Measured")));
 }
+
+void DeviceConditionBox::setConnectivity(const QString &portname)
+{
+    static_cast<QLabel *>(tableWidget->cellWidget(0,1))->setText("Connected");
+        static_cast<QLabel *>(tableWidget->cellWidget(1,1))->setText(portname);
+}
+
+void DeviceConditionBox::setLost()
+{
+    static_cast<QLabel *>(tableWidget->cellWidget(0,1))->setText("Disconnected");
+    static_cast<QLabel *>(tableWidget->cellWidget(1,1))->setText("None");
+}

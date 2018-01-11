@@ -18,6 +18,7 @@ class MainWindow : public QMainWindow
   Q_OBJECT
 private:
   QHash<QString, QAction *> actionMap;
+  QMap<QString,QAction *> menuActionMap;
   Core *core;
   QMenuBar *initMenuBar();
   QToolBar *initToolBar();
@@ -37,6 +38,7 @@ signals:
 
 public slots:
   void connectDevice();
+  void saveData();
   void measureDark();
   void measureRef();
   void measureSpectrum();

@@ -12,24 +12,32 @@
 class DeviceInterface : public QObject
 {
   Q_OBJECT
-private:
-   QSerialPort *device;
-   QHash<QString, QString> deviceConf;
-  bool DeviceConfChanged;
-  QList<double> wavelength;
-
 public:
   explicit DeviceInterface(QObject *parent = nullptr);
-  virtual bool openDevice();
-  virtual void changeConf(const QString &name, const QString &value);
-  virtual void sendConf();
-  virtual void getRef(QList<QPointF> *spectrum);
-  virtual void getDark(QList<QPointF> *spectrum);
-  virtual void getSpectrum(QList<QPointF> *spectrum);
+  virtual void openDevice(const QString &portName = "COM3", QSerialPort::BaudRate baudRate = QSerialPort::Baud115200);
+  virtual void getRef(QList<QPointF> *spectrum, int integration_time = 8, int scan_times = 32);
+  virtual void getDark(QList<QPointF> *spectrum, int integration_time = 8, int scan_times = 32);
+  virtual void getSpectrum(QList<QPointF> *spectrum, int integration_time = 8, int scan_times = 32);
+  virtual double getGainFactor();
+  virtual bool setGainFactor(double gainFactor);
+  virtual bool getGainDetector(); //high = true ; low = false;
+  virtual bool setGainDetector(bool high = false);
+  virtual bool isConnected();
 signals:
+  void portDisconnected();
+  void portConnected(QString);
+  void errorOccur(QSerialPort::SerialPortError);
   void startMeasuring();
   void endMeasuring();
 public slots:
+
+private:
+  QSerialPort *device;
+  bool deviceConnectivity;
+
+private slots:
+  void setLost();
+  void setConnectted();
 };
 
 #endif // DEVICEINTERFACE_H

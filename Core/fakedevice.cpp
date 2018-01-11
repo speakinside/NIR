@@ -4,32 +4,23 @@
 #include <QTimer>
 #include <plog/Log.h>
 
-FakeDevice::FakeDevice(QObject *parent) : QObject(parent)
+FakeDevice::FakeDevice(QObject *parent) : DeviceInterface(parent)
 {
     //TO DO:More human interface
     device = new QSerialPort(this);
     wavelength = QList<double>({841.7, 850, 858.2, 866.4, 874.6, 882.9, 891.1, 899.3, 907.6, 915.8, 924, 932.3, 940.5, 948.7, 957, 965.2, 973.4, 981.7, 989.9, 998.1, 1006.4, 1014.6, 1022.9, 1031.1, 1039.4, 1047.6, 1055.8, 1064.1, 1072.3, 1080.6, 1088.8, 1097.1, 1105.3, 1113.6, 1121.8, 1130.1, 1138.3, 1146.6, 1154.8, 1163.1, 1171.4, 1179.6, 1187.9, 1196.1, 1204.4, 1212.7, 1220.9, 1229.2, 1237.4, 1245.7, 1254, 1262.2, 1270.5, 1278.8, 1287, 1295.3, 1303.6, 1311.8, 1320.1, 1328.4, 1336.6, 1344.9, 1353.2, 1361.5, 1369.7, 1378, 1386.3, 1394.6, 1402.9, 1411.1, 1419.4, 1427.7, 1436, 1444.3, 1452.5, 1460.8, 1469.1, 1477.4, 1485.7, 1494, 1502.3, 1510.5, 1518.8, 1527.1, 1535.4, 1543.7, 1552, 1560.3, 1568.6, 1576.9, 1585.2, 1593.5, 1601.8, 1610.1, 1618.4, 1626.7, 1635, 1643.3, 1651.6, 1659.9, 1668.2, 1676.5, 1684.8, 1693.1, 1701.4, 1709.7, 1718, 1726.3, 1734.7, 1743, 1751.3, 1759.6, 1767.9, 1776.2, 1784.5, 1792.8, 1801.2, 1809.5, 1817.8, 1826.1, 1834.4, 1842.8, 1851.1, 1859.4, 1867.7, 1876.1, 1884.4, 1892.7});
+    deviceConf["gainFactor"] = "1.5";
+    deviceConf["gainDetector"] = "True";
 }
 
-bool FakeDevice::openDevice()
+void FakeDevice::openDevice(const QString &portName, QSerialPort::BaudRate baudRate)
 {
-    return true;
+    emit portConnected(portName);
+    return;
 }
 
-void FakeDevice::changeConf(const QString &name, const QString &value)
-{
-    LOG_INFO << "Change Configure: set " << name << " to " << value;
-    DeviceConfChanged = true;
-    deviceConf[name] = value;
-}
 
-void FakeDevice::sendConf()
-{
-    LOG_INFO << "Send Configuration";
-    DeviceConfChanged = false;
-}
-
-void FakeDevice::getRef(QList<QPointF> *spectrum)
+void FakeDevice::getRef(QList<QPointF> *spectrum, int integration_time, int scan_times)
 {
     LOG_INFO << "Try to get Ref";
     emit startMeasuring();
@@ -41,7 +32,7 @@ void FakeDevice::getRef(QList<QPointF> *spectrum)
     emit endMeasuring();
 }
 
-void FakeDevice::getDark(QList<QPointF> *spectrum)
+void FakeDevice::getDark(QList<QPointF> *spectrum,int integration_time, int scan_times)
 {
     LOG_INFO << "Try to get Dark";
     emit startMeasuring();
@@ -53,7 +44,7 @@ void FakeDevice::getDark(QList<QPointF> *spectrum)
     emit endMeasuring();
 }
 
-void FakeDevice::getSpectrum(QList<QPointF> *spectrum)
+void FakeDevice::getSpectrum(QList<QPointF> *spectrum, int integration_time, int scan_times)
 {
     LOG_INFO << "Try to get Spectrum";
     emit startMeasuring();
@@ -62,9 +53,31 @@ void FakeDevice::getSpectrum(QList<QPointF> *spectrum)
     auto i = ref.begin();
     auto x = wavelength.begin();
     while (x != wavelength.end())
-        *spectrum << QPointF(*x++, (double)qrand() / RAND_MAX * *i++);
-    static QTimer *timer = new QTimer(this);
-    timer->start(1e3);
-    while(timer->remainingTime());
+        *spectrum << QPointF(*x++, (double)qrand() / RAND_MAX * *i+++800);
     emit endMeasuring();
+}
+
+double FakeDevice::getGainFactor()
+{
+    return deviceConf["gainFactor"].toDouble();
+}
+
+bool FakeDevice::setGainFactor(double gainFactor)
+{
+    deviceConf["gainFactor"] = QString::number(gainFactor);
+    return true;
+}
+
+bool FakeDevice::getGainDetector()
+{
+    return deviceConf["gainDetector"]=="True"?true:false;
+}
+
+bool FakeDevice::setGainDetector(bool high)
+{
+    if(high)
+        deviceConf["gainDetector"]=="True";
+    else
+        deviceConf["gainDetector"]=="False";
+    return true;
 }

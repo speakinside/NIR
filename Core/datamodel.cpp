@@ -4,6 +4,7 @@
 #include <QPixmap>
 #include <Qtime>
 #include <QChart>
+#include <cmath>
 
 DataModel::DataModel(DeviceInterface *device, QObject *parent) : QAbstractTableModel(parent), device(device)
 {
@@ -192,7 +193,7 @@ QList<QPointF> *DataModel::intToAbs(const QList<QPointF> *intSpectra)
     auto ref = std::get<3>(data_table[1]);
     for (int c = 0; c < intSpectra->size(); c++)
         list->append(QPointF(intSpectra->at(c).x(),
-                             (intSpectra->at(c).y() - dark->at(c).y()) / (ref->at(c).y() - dark->at(c).y())));
+                             std::log10((ref->at(c).y() - dark->at(c).y()) / (intSpectra->at(c).y() - dark->at(c).y()))));
     return list;
 }
 
@@ -202,6 +203,11 @@ void DataModel::changeVisible(const QModelIndex &index)
         setData(index, "Hide", Qt::DisplayRole);
     else
         setData(index, "Show", Qt::DisplayRole);
+}
+
+void DataModel::save()
+{
+
 }
 
 QXYSeries *DataModel::dataToLine(QList<QPointF> *spectrum, QString chart, QAbstractSeries::SeriesType type)
@@ -229,6 +235,11 @@ QXYSeries *DataModel::dataToLine(QList<QPointF> *spectrum, QString chart, QAbstr
 
 void DataModel::getSpectrum(QString name, int index, QAbstractSeries::SeriesType type)
 {
+    if(!device->isConnected())
+    {
+        emit noConnection();
+        return;
+    }
     if (data_table.size() < 2)
     {
         emit noRefAndDark();
@@ -243,6 +254,11 @@ void DataModel::getSpectrum(QString name, int index, QAbstractSeries::SeriesType
 
 void DataModel::getRef(int index, QAbstractSeries::SeriesType type)
 {
+    if(!device->isConnected())
+    {
+        emit noConnection();
+        return;
+    }
     if (data_table.empty())
     {
         emit noRefAndDark();
@@ -270,6 +286,11 @@ void DataModel::getRef(int index, QAbstractSeries::SeriesType type)
 
 void DataModel::getDark(int index, QAbstractSeries::SeriesType type)
 {
+    if(!device->isConnected())
+    {
+        emit noConnection();
+        return;
+    }
     auto spectrum = new QList<QPointF>;
     device->getDark(spectrum);
     if (data_table.empty())

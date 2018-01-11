@@ -14,6 +14,8 @@ ConnectDialog::ConnectDialog(QWidget *parent , Qt::WindowFlags f ):QDialog(paren
 
     for(auto &i:{1200,2400,4800,9600,19200,38400,57600,115200})
         baudrate->addItem(QString::number(i));
+    baudrate->setCurrentIndex(7);
+    refreshPorts();
     auto layout = new QFormLayout;
     layout->addRow(tr("Serial Port:"),comSerial);
     layout->addRow(tr("BaudRate:"),baudrate);
@@ -27,12 +29,22 @@ ConnectDialog::ConnectDialog(QWidget *parent , Qt::WindowFlags f ):QDialog(paren
 
 void ConnectDialog::refreshPorts()
 {
+    comSerial->clear();
+
+    comSerial->addItem(QString("COM3"));
+
     auto list = QSerialPortInfo::availablePorts();
     for(auto &i:list)
     comSerial->addItem(i.portName());
+
 }
 
 QSerialPort::BaudRate ConnectDialog::getBaudRate()
 {
-    return QSerialPort::Baud19200;
+    return static_cast<QSerialPort::BaudRate>(baudrate->currentText().toInt());
+}
+
+QString ConnectDialog::getPortName()
+{
+    return comSerial->currentText();
 }

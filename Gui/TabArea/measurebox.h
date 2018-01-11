@@ -11,7 +11,8 @@ class MeasureBox : public QGroupBox
     QTableWidget *tableWidget;
 public:
     explicit MeasureBox(QWidget *parent = nullptr);
-
+    int getIntTime();
+    int getScanTimes();
 signals:
 
 public slots:

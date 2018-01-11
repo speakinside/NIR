@@ -14,6 +14,8 @@ public:
 signals:
 
 public slots:
+    void setConnectivity(const QString &portname);
+    void setLost();
 };
 
 #endif // DEVICECONDITIONBOX_H

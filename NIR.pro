@@ -40,7 +40,9 @@ SOURCES += \
     Gui/Dialogs/aboutdialog.cpp \
     Gui/Dialogs/measuredialog.cpp \
     Gui/Dialogs/connectdialog.cpp \
-    Core/fakedevice.cpp
+    Core/fakedevice.cpp \
+    Core/saveproxy.cpp \
+    Gui/Dialogs/savedialog.cpp
 
 HEADERS += \
     Core/deviceinterface.h \
@@ -59,7 +61,9 @@ HEADERS += \
     Gui/Dialogs/aboutdialog.h \
     Gui/Dialogs/measuredialog.h \
     Gui/Dialogs/connectdialog.h \
-    Core/fakedevice.h
+    Core/fakedevice.h \
+    Core/saveproxy.h \
+    Gui/Dialogs/savedialog.h
 
 RESOURCES += \
     res.qrc

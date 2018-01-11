@@ -19,6 +19,7 @@ class DeviceInterface;
 class DataModel : public QAbstractTableModel
 {
   Q_OBJECT
+      DeviceInterface *device;
 public:
   explicit DataModel(DeviceInterface *device, QObject *parent = nullptr);
   int rowCount(const QModelIndex &parent = QModelIndex()) const;
@@ -34,13 +35,15 @@ public:
   QXYSeries *dataToLine(QList<QPointF> *spectrum, QString chart = "intensity", QAbstractSeries::SeriesType type = QAbstractSeries::SeriesTypeLine);
   QList<QPointF> *intToAbs(const QList<QPointF> *intSpectra);
   void changeVisible(const QModelIndex &index);
-  DeviceInterface *device;
+
   //tuple<name,index,time,data,intensity series,absorbance series>
   QList<std::tuple<QString, int, QDateTime, QList<QPointF> *, QXYSeries *, QXYSeries *>> data_table;
 signals:
   void newSeriesCreated(QAbstractSeries *, QString);
   void noRefAndDark();
+  void noConnection();
 public slots:
+  void save();
   void getSpectrum(QString name, int index, QAbstractSeries::SeriesType type = QAbstractSeries::SeriesTypeLine);
   void getRef(int index, QAbstractSeries::SeriesType type = QAbstractSeries::SeriesTypeLine);
   void getDark(int index, QAbstractSeries::SeriesType type = QAbstractSeries::SeriesTypeLine);
